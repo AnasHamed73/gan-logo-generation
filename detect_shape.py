@@ -7,13 +7,17 @@ import os
 import shutil
 
 IMG_SIZE = 32
-DEBUG = True
+DEBUG = False
+
+imgs_path = "/home/kikuchio/Documents/courses/gan-seminar/logan-code/LLD_favicons_clean_png/all"
+encoding_file = "one_hot_encoding"
 
 def show_img(img, name="title"):
     if not DEBUG:
         return
-    cv2.imshow(name, img)
-    cv2.waitKey(0)
+    #cv2.imshow(name, img)
+    cv2.imshow("img", img)
+    cv2.waitKey(500)
 
 
 def one_pad(img, pwx, pwy):
@@ -234,12 +238,16 @@ def one_hot(shape):
         return "0,0,1"
 
 
-def get_contour_binary(img):
+def get_contour_binary(img, img_in):
     img, contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    max_index, max_area = max(enumerate([cv2.contourArea(x) for x in contours]), key = lambda x: x[1])
+    areas = [cv2.contourArea(x) for x in contours]
+    if areas == []:
+        return None
+    max_index, max_area = max(enumerate(areas), key = lambda x: x[1])
     max_contour = contours[max_index]
     
     img_out = img_in
+    w, h, c = img_in.shape 
     o = cv2.drawContours(img_out, [max_contour], 0, (0, 0, 255), 1)
     
     cnt = np.zeros((h, w, 3), dtype=np.uint8)
@@ -264,38 +272,48 @@ def points_to_dict(cnt_bin):
     return cnt_point_dict
 
 
+def get_image_shape(img_path):
+    img_in = cv2.imread(img_path)
+    img_name = img_path.split("/")[-1]
+    if DEBUG:
+        print("Image name: ", img_name)
+    show_img(img_in, img_name)
+    padded = one_pad(img_in, 5, 5)
+    show_img(padded, "padded")
+    img_in = padded
+    
+    w, h, c = img_in.shape 
+    
+    img = cv2.Canny(img_in, 50, 50)
+    
+    kernel = np.ones((4, 4), np.uint8)
+    img = cv2.dilate(img, kernel, 1)
+    
+    cnt_bin = get_contour_binary(img, img_in)
+    if cnt_bin is None:
+        print("found logo with no contour")
+        return "other"
+    
+    cnt_point_dict = points_to_dict(cnt_bin)
+    
+    shape = get_shape(cnt_point_dict, img_in)
+
+    return shape
+
+
 ######MAIN
 
-ap = argparse.ArgumentParser()
-ap.add_argument("-i", "--image", required=True,
-	help="path to the input image")
-args = vars(ap.parse_args())
 
-img_in = cv2.imread(args["image"])
-img_src = args['image']
-img_name = img_src.split("/")[-1]
-if DEBUG:
-    print("Image name: ", img_name)
-show_img(img_in, img_name)
-padded = one_pad(img_in, 5, 5)
-show_img(padded, "padded")
-img_in = padded
-
-w, h, c = img_in.shape 
-
-img = cv2.Canny(img_in, 50, 50)
-
-kernel = np.ones((4, 4), np.uint8)
-img = cv2.dilate(img, kernel, 1)
-
-cnt_bin = get_contour_binary(img)
-
-cnt_point_dict = points_to_dict(cnt_bin)
-
-shape = get_shape(cnt_point_dict, img_in)
-if DEBUG:
-    print("shape: ", shape)
-print(one_hot(shape))
+for img in sorted(os.listdir(imgs_path)):
+    shape = get_image_shape(os.path.join(imgs_path, img))
+    if DEBUG:
+        print("shape: ", shape)
+    ohe = one_hot(shape)
+    print(f"{img}:{ohe}")
+    with open(encoding_file, "a+") as f:
+        f.write(img+ ":" + ohe+"\n")
+    with open(shape+"_imgs", "a+") as f:
+        f.write(img+"\n")
 
 #img_dest = os.path.join(shape, img_name)
 #if not DEBUG:
