@@ -28,7 +28,7 @@ parser.add_argument('--gan', default="sa", help='dc | sa: use either Deep Convol
 parser.add_argument('--nz', type=int, default=100, help='size of the latent z vector')
 parser.add_argument('--ngf', type=int, default=64)
 parser.add_argument('--ndf', type=int, default=64)
-parser.add_argument('--niter', type=int, default=1000, help='number of epochs to train for')
+parser.add_argument('--niter', type=int, default=300, help='number of epochs to train for')
 parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--cuda', action='store_true', help='enables cuda')
@@ -49,12 +49,12 @@ ndf = int(opt.ndf)
 num_classes = 12
 nc = 3
 
-#data_path = "/home/kikuchio/courses/gan/logan-code/LLD_favicons_clean_png"
-#labels_path = "/home/kikuchio/courses/gan/logan-code/one_hot_encoding_color_icon.csv"
-data_path = "/home/kikuchio/Documents/courses/gan-seminar/logan-code/LLD_favicons_clean_png"
-labels_path = "/home/kikuchio/Documents/courses/gan-seminar/logan-code/one_hot_encoding_color_icon.csv"
+data_path = "/home/kikuchio/torch/LLD_favicons_clean_png"
+labels_path = "/home/kikuchio/torch/one_hot_encoding_color_icon.csv"
+#data_path = "/home/kikuchio/Documents/courses/gan-seminar/logan-code/LLD_favicons_clean_png"
+#labels_path = "/home/kikuchio/Documents/courses/gan-seminar/logan-code/one_hot_encoding_color_icon.csv"
 
-batch_size = 64
+batch_size = 61
 num_epochs = 1
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -103,6 +103,7 @@ def train(gan, train_dataloader):
             .unsqueeze(2).unsqueeze(3).to(device, non_blocking=True)
     netG = gan.netG
     netD = gan.netD
+    netQ = gan.netQ
     for epoch in range(opt.niter):
         for i, data in enumerate(train_dataloader, 0):
             print('[%d/%d][%d/%d] ' % (epoch, opt.niter, i, len(train_dataloader),), end="")
@@ -118,6 +119,7 @@ def train(gan, train_dataloader):
         # save checkpoint
         torch.save(netG.state_dict(), '%s/netG/netG_epoch_%d.pth' % (opt.checkpoint, epoch))
         torch.save(netD.state_dict(), '%s/netD/netD_epoch_%d.pth' % (opt.checkpoint, epoch))
+        torch.save(netQ.state_dict(), '%s/netQ/netQ_epoch_%d.pth' % (opt.checkpoint, epoch))
 
 ###### MAIN
 
@@ -148,6 +150,7 @@ print(gan.netQ)
 if opt.cuda:
     gan.netD.cuda()
     gan.netG.cuda()
+    gan.netQ.cuda()
 
 train(gan, train_dataloader)
 
