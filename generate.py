@@ -46,11 +46,19 @@ nc = 3
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+available_shapes = ["square", "circle", "other"]
+
 def _get_one_hot_vector(class_indices, num_classes, batch_size):
     y_onehot = torch.FloatTensor(batch_size, num_classes)
     y_onehot.zero_()
     return y_onehot.scatter_(1, class_indices.unsqueeze(1), 1)
 
+
+def make_random_labels(batchSize):
+    labels = torch.zeros(opt.batchSize).long().random_(0, num_classes)
+    class_one_hot = _get_one_hot_vector(labels, num_classes, batchSize)\
+    .unsqueeze(2).unsqueeze(3).to(device, non_blocking=True)
+    return class_one_hot
 
 def make_labels(label, batchSize):
     labels = torch.zeros(batchSize).long().fill_(label)
@@ -91,7 +99,12 @@ gan.netG.load_state_dict(torch.load(opt.bestGenModel, map_location=device))
 print("model loaded")
 
 fixed_noise = torch.randn(opt.batchSize, nz, 1, 1, device=device)
-class_one_hot = make_labels(shape_label(opt.shape), opt.batchSize)
+
+class_one_hot = None
+if opt.shape not in available_shapes:
+    class_one_hot = make_random_labels(opt.batchSize)
+else:
+    class_one_hot = make_labels(shape_label(opt.shape), opt.batchSize)
 
 fake = gan.netG(fixed_noise, class_one_hot)
 vutils.save_image(fake.detach(),
