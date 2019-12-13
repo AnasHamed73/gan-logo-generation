@@ -17,11 +17,10 @@ from acwgangp_torch import ACWGANGP
 from torch.utils import data
 import torchvision
 from torchvision import models, datasets
-from read_images import read_labels_from
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--bestGenModel', default="checkpoint/netG/netG_epoch_194.pth", help='the best generator model')
-parser.add_argument('--shape', default="circle", help='square|circle|other')
+parser.add_argument('--bestGenModel', default="checkpoint/netG/netG_epoch_240.pth", help='the best generator model')
+parser.add_argument('--shape', default="random", help='square|circle|other')
 parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
 parser.add_argument('--gan', default="sa", help='dc | sa: use either Deep Convolutional GAN or Self Attention GAN')
 parser.add_argument('--nz', type=int, default=100, help='size of the latent z vector')
@@ -68,11 +67,11 @@ def make_labels(label, batchSize):
 
 def shape_label(shape):
     if shape == "square":
-        return 0
-    elif shape == "circle":
-        return 1
-    else:
         return 2
+    elif shape == "circle":
+        return 0
+    else:
+        return 1
 
 ###### MAIN
 
@@ -95,7 +94,9 @@ gan = ACWGANGP(nc=nc, nz=nz, ngf=ngf, ndf=ndf, ngpu=ngpu, num_classes=num_classe
 if opt.cuda:
     gan.netG.cuda()
 
-gan.netG.load_state_dict(torch.load(opt.bestGenModel, map_location=device))
+gan.netG.eval()
+cp = torch.load(opt.bestGenModel, map_location=device)
+gan.netG.load_state_dict(cp)
 print("model loaded")
 
 fixed_noise = torch.randn(opt.batchSize, nz, 1, 1, device=device)
@@ -108,6 +109,7 @@ else:
 
 fake = gan.netG(fixed_noise, class_one_hot)
 vutils.save_image(fake.detach(),
-        '%s/gen_%s_%s.png' % (opt.outf, opt.shape, opt.batchSize),
+        #'%s/gen_%s_%s.png' % (opt.outf, opt.shape, opt.batchSize),
+        '%s/gen_%s_%s.png' % (opt.outf, opt.shape, opt.bestGenModel.split("_")[-1].split(".")[0]),
         normalize=True)
 

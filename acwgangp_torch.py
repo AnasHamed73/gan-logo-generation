@@ -20,9 +20,10 @@ class ACWGANGP:
     # Number of iterations to train the discriminator for each 
     #     iteration of generator training
     d_iter = 1
-    num_classes = 12
+    g_iter = 1
+    num_classes = 3
 
-    def __init__(self, nc=3, nz=100, ngf=64, ndf=64, ngpu=1, num_classes=12):
+    def __init__(self, nc=3, nz=100, ngf=64, ndf=64, ngpu=1, num_classes=3):
         self.nc = nc
         self.ngf = ngf
         self.ndf = ndf
@@ -38,7 +39,7 @@ class ACWGANGP:
         self.num_classes = num_classes
         self.optimizerD = optim.Adam(self.netD.parameters(), lr=0.0005, betas=(0.0, 0.9))
         self.optimizerQ = optim.Adam(self.netQ.parameters(), lr=0.0005, betas=(0.0, 0.9))
-        self.optimizerG = optim.Adam(self.netG.parameters(), lr=0.0001, betas=(0.0, 0.9))
+        self.optimizerG = optim.Adam(self.netG.parameters(), lr=0.0005, betas=(0.0, 0.9))
 
 
     def _weights_init(self, m):
@@ -121,12 +122,11 @@ class ACWGANGP:
     def train_on_batch(self, data, device):
         real_cpu = data[0].to(device)
         batch_size = real_cpu.size(0)
-        #class_one_hot = self._get_one_hot_vector(data[1], self.num_classes, batch_size)\
-        #    .unsqueeze(2).unsqueeze(3).to(device, non_blocking=True)
         class_one_hot = data[1].unsqueeze(2).unsqueeze(3).to(device, non_blocking=True)
         for i in range(self.d_iter):
             errD = self._train_discriminator(real_cpu, batch_size, device, class_one_hot)
-        errG = self._train_generator(batch_size, class_one_hot, device)
+        for i in range(self.g_iter):
+            errG = self._train_generator(batch_size, class_one_hot, device)
         print('Loss_D: %.4f; Loss_G: %.4f' 
                 % (errD.item(), errG.item(),))
 
@@ -171,45 +171,22 @@ class _Generator(nn.Module):
         self.num_classes = num_classes
         self.nz = nz
 
-        #self.deconv1 = self.spectral_norm(nn.ConvTranspose2d(nz+self.num_classes, ngf * 8, 4, 1, 0, bias=False))
-        #self.bn1 = nn.BatchNorm2d(ngf * 8)
-        #self.relu = nn.ReLU(True)
-        #
-        #self.deconv2 = self.spectral_norm(nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False))
-        #self.bn2 = nn.BatchNorm2d(ngf * 4)
-        #
-        #self.deconv3 = self.spectral_norm(nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False))
-        #self.bn3 = nn.BatchNorm2d(ngf * 2)
-        #self.sa3 = _SelfAttention(ngf * 2, ngpu)
-
-        #self.deconv4 = self.spectral_norm(nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False))
-        #self.bn4 = nn.BatchNorm2d(ngf, num_classes)
-        #self.sa4 = _SelfAttention(ngf, ngpu)
-
-        #self.deconv5 = self.spectral_norm(nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False))
-        #self.tanh = nn.Tanh()
-
-
-        ###############################################3
-
-        self.deconv1 = self.spectral_norm(nn.ConvTranspose2d(nz+self.num_classes, ngf * 8, 4, 1, 0, bias=False))
+        self.deconv1 = nn.ConvTranspose2d(nz+self.num_classes, ngf * 8, 4, 1, 0, bias=False)
         self.lin1 = nn.Linear(nz+self.num_classes, 1024)
         self.bn1 = nn.BatchNorm2d(1024)
         self.relu = nn.ReLU(True)
         
         self.lin2 = nn.Linear(1024, 128*8*8)
-        self.deconv2 = self.spectral_norm(nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False))
+        self.deconv2 = nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False)
         self.bn2 = nn.BatchNorm2d(128*8*8)
         
-        self.deconv3 = self.spectral_norm(nn.ConvTranspose2d(128, 64, 4, 2, 1, bias=False))
+        self.deconv3 = nn.ConvTranspose2d(128, 64, 4, 2, 1, bias=False)
         self.bn3 = nn.BatchNorm2d(64)
-        self.sa3 = _SelfAttention(ngf * 2, ngpu)
 
-        self.deconv4 = self.spectral_norm(nn.ConvTranspose2d(64, 3, 4, 2, 1, bias=False))
+        self.deconv4 = nn.ConvTranspose2d(64, 3, 4, 2, 1, bias=False)
         self.bn4 = nn.BatchNorm2d(3)
-        self.sa4 = _SelfAttention(ngf, ngpu)
 
-        self.deconv5 = self.spectral_norm(nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False))
+        self.deconv5 = nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False)
         self.tanh = nn.Tanh()
         self.sigmoid = nn.Sigmoid()
 
@@ -224,17 +201,6 @@ class _Generator(nn.Module):
 
 
     def forward(self, input, labels):
-        #x = torch.cat([input, labels], dim=1)
-        #x = self.relu(self.bn1(self.deconv1(x)))
-        #x = self.relu(self.bn2(self.deconv2(x)))
-        #x = self.relu(self.bn3(self.deconv3(x)))
-        #x = self.sa3(x)
-        #x = self.relu(self.bn4(self.deconv4(x)))
-        #x = self.sa4(x)
-        #output = self.tanh(self.deconv5(x))
-        #return output
-
-        
         z = torch.cat([input, labels], dim=1)
         z = z.view(-1, self.num_classes + self.nz)
         x = self.lin1(z).view(-1, 1024, 1, 1)
@@ -245,11 +211,12 @@ class _Generator(nn.Module):
         x = self.relu(self.bn2(x))
         x = x.view(input.size()[0], 128, 8, 8)
         x = self.relu(self.bn3(self.deconv3(x)))
-        out = self.sigmoid(self.deconv4(x))
+        out = self.tanh(self.deconv4(x))
         return out
         
 
 class _Discriminator(nn.Module):
+
     def __init__(self, ngpu, nc, ndf, num_classes):
         super(_Discriminator, self).__init__()
         self.ngpu = ngpu
@@ -257,44 +224,25 @@ class _Discriminator(nn.Module):
         self.ndf = ndf
 
         #self.conv1 = self.spectral_norm(nn.Conv2d(nc, ndf, 4, 2, 1, bias=False))
-        #self.lrelu = nn.LeakyReLU(0.2, inplace=True)
-
-        #self.conv2 = self.spectral_norm(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False))
-        #self.bn2 = nn.BatchNorm2d(ndf)
-
-        #self.conv3 = self.spectral_norm(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False))
-        #self.bn3 = nn.BatchNorm2d(ndf * 4)
-
-        #self.sa3 = _SelfAttention(ndf * 4, ngpu)
-
-        #self.conv4 = self.spectral_norm(nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False))
-        #self.bn4 = nn.BatchNorm2d(ndf * 8)
-
-        #self.sa4 = _SelfAttention(ndf * 8, ngpu)
-
-        #self.conv5 = self.spectral_norm(nn.Conv2d(ndf * 8, ndf * 8, 3, 1, 1, bias=False))
-        #self.bn5 = nn.BatchNorm2d(ndf * 8)
-
-        #self.embed = self.spectral_norm(nn.Linear(num_classes, ndf * 128))
-        #self.fc = self.spectral_norm(nn.Linear(ndf * 128, 1))
-
-        ##############################################
-
-        self.conv1 = self.spectral_norm(nn.Conv2d(nc, ndf, 4, 2, 1, bias=False))
+        self.conv1 = nn.Conv2d(nc, ndf, 4, 2, 1, bias=False)
         self.lrelu = nn.LeakyReLU(0.2, inplace=True)
 
-        self.conv2 = self.spectral_norm(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False))
+        #self.conv2 = self.spectral_norm(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False))
+        self.conv2 = nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False)
         self.bn2 = nn.BatchNorm2d(ndf * 2)
 
-        self.conv3 = self.spectral_norm(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False))
-        self.lin3 = self.spectral_norm(nn.Linear(128*8*8, ndf * 16))
+        #self.conv3 = self.spectral_norm(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False))
+        self.conv3 = nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False)
+        #self.lin3 = self.spectral_norm(nn.Linear(128*8*8, ndf * 16))
+        self.lin3 = nn.Linear(128*8*8, ndf * 16)
         self.bn3 = nn.BatchNorm2d(ndf * 16)
 
         self.logit_lin = nn.Linear(ndf * 16, 1)
         self.sigmoid = nn.Sigmoid()
-        self.embed = self.spectral_norm(nn.Linear(num_classes, ndf * 16))
-        self.fc = self.spectral_norm(nn.Linear(ndf * 16, 1))
-
+        #self.embed = self.spectral_norm(nn.Linear(num_classes, ndf * 16))
+        #self.fc = self.spectral_norm(nn.Linear(ndf * 16, 1))
+        self.embed = nn.Linear(num_classes, ndf * 16)
+        self.fc = nn.Linear(ndf * 16, 1)
 
 
     def spectral_norm(self, module, gain=1):
@@ -306,22 +254,6 @@ class _Discriminator(nn.Module):
 
 
     def forward(self, input, labels):
-        #x = self.lrelu(self.conv1(input))
-        #x = self.lrelu(self.bn2(self.conv2(x)))
-        #x = self.lrelu(self.bn3(self.conv3(x)))
-        #x = self.sa3(x)
-        #x = self.lrelu(self.bn4(self.conv4(x)))
-        #x = self.sa4(x)
-        #x = self.lrelu(self.bn5(self.conv5(x)))
-
-        #x = x.view(-1, self.ndf * 128)
-        #fco = self.fc(x)
-        #x_reshaped = x.view(-1, 1, self.ndf * 128)
-        #emb_reshaped = self.embed(labels.squeeze()).view(-1, self.ndf * 128, 1)
-        #output = fco + torch.bmm(x_reshaped, emb_reshaped).view(input.size(0), 1)
-        #output = output.view(-1, 1).squeeze(1)
-        #return output
-
         x = self.lrelu(self.conv1(input))
         o2 = self.conv2(x)
         x = self.lrelu(self.bn2(o2))
@@ -330,10 +262,7 @@ class _Discriminator(nn.Module):
         x = self.lrelu(self.bn3(o3))
         x = x.view(-1, 1024)
         out_logit = self.logit_lin(x)
-        out = self.sigmoid(out_logit)
 
-
-        #x = x.view(-1, self.ndf * 128)
         fco = self.fc(x)
         x_reshaped = x.view(-1, 1, self.ndf * 16)
         emb_reshaped = self.embed(labels.squeeze()).view(-1, self.ndf * 16, 1)
@@ -352,8 +281,10 @@ class _Classifier(nn.Module):
 
         self.lrelu = nn.LeakyReLU(negative_slope=0.2)
         self.bn1 = nn.BatchNorm2d(128)
-        self.lin1 = self.spectral_norm(nn.Linear(1024, 128))
-        self.logit_lin = self.spectral_norm(nn.Linear(128, num_classes))
+        #self.lin1 = self.spectral_norm(nn.Linear(1024, 128))
+        #self.logit_lin = self.spectral_norm(nn.Linear(128, num_classes))
+        self.lin1 = nn.Linear(1024, 128)
+        self.logit_lin = nn.Linear(128, num_classes)
         self.softmax = nn.Softmax(dim=-1)
 
     def spectral_norm(self, module, gain=1):
@@ -372,14 +303,3 @@ class _Classifier(nn.Module):
         out = self.softmax(out_logit)
         return out, out_logit
 
-        #######################
-    #def classifier(self, x, is_training=True, reuse=False):
-    #    # Network Architecture is exactly same as in infoGAN (https://arxiv.org/abs/1606.03657)
-    #    # Architecture : (64)5c2s-(128)5c2s_BL-FC1024_BL-FC128_BL-FC12S’
-    #    # All layers except the last two layers are shared by discriminator
-    #    #with tf.variable_scope("classifier", reuse=reuse):
-    #    net = lrelu(bn(linear(x, 128, scope='c_fc1'), is_training=is_training, scope='c_bn1'))
-    #    out_logit = linear(net, self.y_dim, scope='c_fc2')
-    #    out = nn.Softmax(out_logit)
-    #    return out, out_logit
-        #######################
