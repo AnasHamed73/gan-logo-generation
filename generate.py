@@ -12,7 +12,7 @@ import torch.utils.data
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
-from acwgangp_torch import ACWGANGP
+from model import _Generator
 
 from torch.utils import data
 import torchvision
@@ -89,14 +89,14 @@ torch.manual_seed(opt.manualSeed)
 if torch.cuda.is_available() and not opt.cuda:
     print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
-gan = ACWGANGP(nc=nc, nz=nz, ngf=ngf, ndf=ndf, ngpu=ngpu, num_classes=num_classes)
+netG = _Generator()
 
 if opt.cuda:
-    gan.netG.cuda()
+   netG.cuda()
 
-gan.netG.eval()
+netG.eval()
 cp = torch.load(opt.bestGenModel, map_location=device)
-gan.netG.load_state_dict(cp)
+netG.load_state_dict(cp)
 print("model loaded")
 
 fixed_noise = torch.randn(opt.batchSize, nz, 1, 1, device=device)
@@ -107,7 +107,7 @@ if opt.shape not in available_shapes:
 else:
     class_one_hot = make_labels(shape_label(opt.shape), opt.batchSize)
 
-fake = gan.netG(fixed_noise, class_one_hot)
+fake = netG(fixed_noise, class_one_hot)
 vutils.save_image(fake.detach(),
         #'%s/gen_%s_%s.png' % (opt.outf, opt.shape, opt.batchSize),
         '%s/gen_%s_%s.png' % (opt.outf, opt.shape, opt.bestGenModel.split("_")[-1].split(".")[0]),

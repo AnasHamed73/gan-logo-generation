@@ -6,18 +6,39 @@ import numpy as np
 import os
 import shutil
 
-IMG_SIZE = 32
-DEBUG = False
 
-imgs_path = "/home/kikuchio/Documents/courses/gan-seminar/logan-code/LLD_favicons_clean_png/all"
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import ImageGrid
+import numpy as np
+
+IMG_SIZE = 32
+DEBUG = True
+
+#imgs_path = "/home/kikuchio/Documents/courses/gan-seminar/logan-code/LLD_favicons_clean_png/all"
+imgs_path = "/home/kikuchio/Documents/courses/gan-seminar/logan-code/tmp"
 encoding_file = "one_hot_encoding"
 
-def show_img(img, name="title"):
+
+def show_img(img, name="title", delay=500):
     if not DEBUG:
         return
-    #cv2.imshow(name, img)
     cv2.imshow("img", img)
-    cv2.waitKey(500)
+    cv2.waitKey(delay)
+    cv2.imwrite(name+".png", img)
+
+
+def show_text(text, title, delay=1000):
+    if not DEBUG:
+        return
+    img = np.zeros((42, 42, 3), dtype=np.uint8)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    bottomLeftCornerOfText = (2 if text == "square" else 5,25)
+    fontScale = 0.4 if text == "other" else 0.35
+    fontColor = (255, 255, 255)
+    lineType = 2
+    cv2.putText(img, text, bottomLeftCornerOfText, font, fontScale, fontColor, 1, cv2.LINE_AA)
+    show_img(img, "shape", delay)
 
 
 def one_pad(img, pwx, pwy):
@@ -257,6 +278,7 @@ def get_contour_binary(img, img_in):
     kernel = np.ones((1, 1), np.uint8)
     cnt = cv2.dilate(cnt, kernel, 1)
     cnt = cv2.erode(cnt, kernel, 1)
+    show_img(cnt, "contour_closed")
     
     cnt_bin = cnt[:, :, 0]
     show_img(cnt_bin, "contour")
@@ -277,7 +299,7 @@ def get_image_shape(img_path):
     img_name = img_path.split("/")[-1]
     if DEBUG:
         print("Image name: ", img_name)
-    show_img(img_in, img_name)
+
     padded = one_pad(img_in, 5, 5)
     show_img(padded, "padded")
     img_in = padded
@@ -285,9 +307,11 @@ def get_image_shape(img_path):
     w, h, c = img_in.shape 
     
     img = cv2.Canny(img_in, 50, 50)
+    show_img(img, "canny")
     
     kernel = np.ones((4, 4), np.uint8)
     img = cv2.dilate(img, kernel, 1)
+    show_img(img, "canny_dilated")
     
     cnt_bin = get_contour_binary(img, img_in)
     if cnt_bin is None:
@@ -297,6 +321,7 @@ def get_image_shape(img_path):
     cnt_point_dict = points_to_dict(cnt_bin)
     
     shape = get_shape(cnt_point_dict, img_in)
+    show_text(shape, "shape", delay=1000)
 
     return shape
 
@@ -308,12 +333,12 @@ for img in sorted(os.listdir(imgs_path)):
     shape = get_image_shape(os.path.join(imgs_path, img))
     if DEBUG:
         print("shape: ", shape)
-    ohe = one_hot(shape)
-    print(f"{img}:{ohe}")
-    with open(encoding_file, "a+") as f:
-        f.write(img+ ":" + ohe+"\n")
-    with open(shape+"_imgs", "a+") as f:
-        f.write(img+"\n")
+    #ohe = one_hot(shape)
+    #print(f"{img}:{ohe}")
+    #with open(encoding_file, "a+") as f:
+    #    f.write(img+ ":" + ohe+"\n")
+    #with open(shape+"_imgs", "a+") as f:
+    #    f.write(img+"\n")
 
 #img_dest = os.path.join(shape, img_name)
 #if not DEBUG:
